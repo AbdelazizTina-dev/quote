@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Quote
 
-## Getting Started
+A tool for solo tradespeople to turn a job estimate into a professional, itemized
+PDF quote, sent via a secure client link, with an option for the client to accept
+and pay a deposit. See [PROJECT_BRIEF.md](PROJECT_BRIEF.md) for the full pitch.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Next.js (App Router) + TypeScript + Tailwind
+- Supabase (Postgres + magic-link auth)
+- Stripe Connect + Checkout (Phase 4)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Run the migration: paste `supabase/migrations/00001_init.sql` into the
+   Supabase SQL Editor and run it (or use `supabase db push` with the CLI).
+3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key
+   (Supabase dashboard → Settings → API).
+4. In Supabase dashboard → Authentication → URL Configuration, set the Site URL
+   to `http://localhost:3000` (update when deploying).
+5. `npm run dev` and open [http://localhost:3000](http://localhost:3000).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Sign in with a magic link, then fill in your business profile under Settings.
 
-## Learn More
+> Note: `.npmrc` pins the public npm registry for this project (the machine's
+> global npm config points at a corporate registry).
 
-To learn more about Next.js, take a look at the following resources:
+## Build phases (from the brief)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [x] **Phase 1:** Auth + business profile + schema (users/profiles, quotes, line_items)
+- [ ] **Phase 2:** Quote builder UI + PDF generation
+- [ ] **Phase 3:** Public client-facing quote page (`/q/{token}`)
+- [ ] **Phase 4:** Stripe Connect onboarding + deposit checkout
+- [ ] **Phase 5:** Dashboard polish + email sending
+- [ ] **Phase 6:** Subscription billing, error handling, deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture notes
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Money is stored as **integer cents** everywhere (`unit_price_cents`, fixed
+  deposits). Percent deposits store the whole-number percent.
+- Every quote gets a non-guessable hex `token` at insert time (Postgres
+  `gen_random_bytes`), which will back the public `/q/{token}` link in Phase 3.
+- Row Level Security restricts profiles/quotes/line_items to their owner. The
+  public quote page will read via a server-side service-role client, not RLS.
+- A DB trigger auto-creates a `profiles` row on signup.
+- Auth-session refresh and route protection live in `src/proxy.ts`
+  (Next 16's replacement for `middleware.ts`).
