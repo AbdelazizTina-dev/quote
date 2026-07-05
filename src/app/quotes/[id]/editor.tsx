@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
   depositCents,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/types";
 import { btnPrimary, btnSecondary, card, input } from "@/lib/ui";
 import { StatusBadge } from "@/components/status-badge";
-import { deleteQuote, saveQuote } from "./actions";
+import { deleteQuote, markSent, saveQuote } from "./actions";
 
 type EditableItem = {
   key: number;
@@ -69,7 +70,9 @@ export function QuoteEditor({
       : [{ key: nextKey++, kind: "labor", description: "", quantity: "1", unitPrice: "0.00" }]
   );
   const [message, setMessage] = useState<{ kind: "saved" | "error"; text: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const subtotalCents = useMemo(
     () => items.reduce((sum, item) => sum + itemCents(item), 0),
@@ -102,6 +105,23 @@ export function QuoteEditor({
 
   function removeItem(key: number) {
     setItems((prev) => prev.filter((item) => item.key !== key));
+  }
+
+  function handleCopyLink() {
+    const url = `${window.location.origin}/q/${quote.token}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+    if (quote.status === "draft") {
+      startTransition(async () => {
+        const result = await markSent(quote.id);
+        if (result.ok) {
+          router.refresh();
+        } else {
+          setMessage({ kind: "error", text: result.error });
+        }
+      });
+    }
   }
 
   function handleSave() {
@@ -180,6 +200,36 @@ export function QuoteEditor({
           {message.text}
         </p>
       )}
+
+      <section className={`${card} mt-6 flex flex-wrap items-center justify-between gap-3 p-4`}>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-zinc-900">Client link</p>
+          <p className="mt-0.5 truncate font-mono text-xs text-zinc-500">
+            /q/{quote.token}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {quote.status !== "draft" && (
+            <a
+              href={`/q/${quote.token}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-blue-700 hover:text-blue-900"
+            >
+              Preview
+            </a>
+          )}
+          <button onClick={handleCopyLink} className={btnSecondary}>
+            {copied ? "Copied ✓" : "Copy client link"}
+          </button>
+        </div>
+        {quote.status === "draft" && (
+          <p className="w-full text-xs text-zinc-500">
+            Copying the link marks this quote as <strong>sent</strong> and makes
+            it visible to anyone with the link.
+          </p>
+        )}
+      </section>
 
       <section className={`${card} mt-6 p-6`}>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">

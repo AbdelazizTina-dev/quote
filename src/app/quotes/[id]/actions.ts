@@ -84,6 +84,29 @@ export async function saveQuote(
   return { ok: true };
 }
 
+// Copying the client link "sends" a draft: the public page only serves
+// quotes that have left draft status.
+export async function markSent(quoteId: string): Promise<SaveResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await supabase
+    .from("quotes")
+    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .eq("id", quoteId)
+    .eq("user_id", user.id)
+    .eq("status", "draft");
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/quotes/${quoteId}`);
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 export async function deleteQuote(quoteId: string) {
   const supabase = await createClient();
   const {
