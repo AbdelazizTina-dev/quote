@@ -23,6 +23,12 @@ export async function updateProfile(formData: FormData) {
       ? Math.round(rawDeposit * 100)
       : Math.min(100, Math.max(0, Math.round(rawDeposit)));
 
+  // Tax entered as a percent (8.25), stored in basis points (825).
+  const taxRateBps = Math.min(
+    10000,
+    Math.max(0, Math.round(Number(formData.get("tax_rate") ?? 0) * 100))
+  );
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -31,6 +37,8 @@ export async function updateProfile(formData: FormData) {
       phone: String(formData.get("phone") ?? "").trim() || null,
       deposit_type: depositType,
       deposit_value: depositValue,
+      default_tax_rate_bps: taxRateBps,
+      default_terms: String(formData.get("default_terms") ?? "").trim(),
     })
     .eq("id", user.id);
 

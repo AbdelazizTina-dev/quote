@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   depositCents,
   formatCents,
+  taxCents,
   type DepositType,
   type LineItem,
   type LineItemKind,
@@ -60,6 +61,8 @@ export function QuoteEditor({
       ? (quote.deposit_value / 100).toFixed(2)
       : String(quote.deposit_value)
   );
+  const [taxRate, setTaxRate] = useState(String(quote.tax_rate_bps / 100));
+  const [terms, setTerms] = useState(quote.terms);
   const [items, setItems] = useState<EditableItem[]>(
     initialItems.length > 0
       ? initialItems.map(toEditable)
@@ -68,10 +71,13 @@ export function QuoteEditor({
   const [message, setMessage] = useState<{ kind: "saved" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const totalCents = useMemo(
+  const subtotalCents = useMemo(
     () => items.reduce((sum, item) => sum + itemCents(item), 0),
     [items]
   );
+  const taxRateBps = Math.round((parseFloat(taxRate) || 0) * 100);
+  const taxDueCents = taxCents(subtotalCents, taxRateBps);
+  const totalCents = subtotalCents + taxDueCents;
   const depositDueCents = useMemo(() => {
     const value = parseFloat(depositValue) || 0;
     return depositCents(
@@ -111,6 +117,8 @@ export function QuoteEditor({
           depositType === "fixed"
             ? Math.round((parseFloat(depositValue) || 0) * 100)
             : Math.round(parseFloat(depositValue) || 0),
+        tax_rate_bps: taxRateBps,
+        terms,
         items: items.map((item) => ({
           kind: item.kind,
           description: item.description,
@@ -296,11 +304,38 @@ export function QuoteEditor({
         </div>
 
         <div className="mt-6 space-y-4 border-t border-zinc-200 pt-5">
-          <div className="flex items-center justify-between">
-            <span className="text-base font-semibold text-zinc-900">Total</span>
-            <span className="text-xl font-bold tabular-nums text-zinc-900">
-              {formatCents(totalCents)}
-            </span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm text-zinc-700">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{formatCents(subtotalCents)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-zinc-700">
+              <span className="flex items-center gap-2">
+                Tax
+                <span className="relative">
+                  <input
+                    aria-label="Tax rate percent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={taxRate}
+                    onChange={(e) => setTaxRate(e.target.value)}
+                    className="w-20 rounded-lg border border-zinc-300 bg-white py-1 pl-2 pr-6 text-sm text-zinc-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20"
+                  />
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500">
+                    %
+                  </span>
+                </span>
+              </span>
+              <span className="tabular-nums">{formatCents(taxDueCents)}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-zinc-200 pt-2">
+              <span className="text-base font-semibold text-zinc-900">Total</span>
+              <span className="text-xl font-bold tabular-nums text-zinc-900">
+                {formatCents(totalCents)}
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-50 p-4 ring-1 ring-inset ring-blue-100">
@@ -333,6 +368,23 @@ export function QuoteEditor({
             </div>
           </div>
         </div>
+      </section>
+
+      <section className={`${card} mt-6 p-6`}>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
+          Notes &amp; terms
+        </h2>
+        <textarea
+          aria-label="Notes and terms"
+          placeholder={"Price valid for 30 days.\nBalance due on completion."}
+          value={terms}
+          onChange={(e) => setTerms(e.target.value)}
+          rows={3}
+          className={`mt-4 ${input}`}
+        />
+        <p className="mt-2 text-xs text-zinc-500">
+          Shown at the bottom of the quote your client sees.
+        </p>
       </section>
 
       <div className="mt-8 flex justify-end">

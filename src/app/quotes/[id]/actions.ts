@@ -12,6 +12,8 @@ export type QuotePayload = {
   job_description: string;
   deposit_type: DepositType;
   deposit_value: number;
+  tax_rate_bps: number;
+  terms: string;
   items: {
     kind: LineItemKind;
     description: string;
@@ -46,6 +48,8 @@ export async function saveQuote(
         payload.deposit_type === "percent"
           ? Math.min(100, depositValue)
           : depositValue,
+      tax_rate_bps: Math.min(10000, Math.max(0, Math.round(payload.tax_rate_bps))),
+      terms: payload.terms.trim(),
     })
     .eq("id", quoteId)
     .eq("user_id", user.id);

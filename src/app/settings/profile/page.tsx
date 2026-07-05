@@ -95,6 +95,44 @@ export default async function ProfileSettingsPage({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div>
+              <label htmlFor="tax_rate" className={label}>
+                Sales tax rate (%)
+              </label>
+              <input
+                id="tax_rate"
+                name="tax_rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                defaultValue={((profile?.default_tax_rate_bps ?? 0) / 100).toString()}
+                className={`mt-1.5 ${input}`}
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Applied to new quotes. Set 0 if you don&apos;t charge tax.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="default_terms" className={label}>
+              Default notes &amp; terms
+            </label>
+            <textarea
+              id="default_terms"
+              name="default_terms"
+              rows={3}
+              defaultValue={profile?.default_terms ?? ""}
+              placeholder={"Price valid for 30 days.\nBalance due on completion."}
+              className={`mt-1.5 ${input}`}
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              Shown at the bottom of every quote — you can edit per quote.
+            </p>
+          </div>
+
           <fieldset className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
             <legend className="px-1 text-sm font-semibold text-zinc-800">
               Default deposit
