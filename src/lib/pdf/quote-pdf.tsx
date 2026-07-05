@@ -9,7 +9,8 @@ import {
 import {
   depositCents,
   formatCents,
-  quoteTotalCents,
+  formatTaxRate,
+  quoteTotals,
   type LineItem,
   type Profile,
   type Quote,
@@ -64,13 +65,26 @@ const styles = StyleSheet.create({
   colQty: { width: "12%", textAlign: "right" },
   colPrice: { width: "14%", textAlign: "right" },
   colAmount: { width: "14%", textAlign: "right" },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
+  totalsBlock: {
     marginTop: 10,
+    marginLeft: "auto",
+    width: 200,
   },
-  totalLabel: { fontFamily: "Helvetica-Bold", fontSize: 12, marginRight: 24 },
-  totalValue: { fontFamily: "Helvetica-Bold", fontSize: 12 },
+  totalsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 3,
+  },
+  totalsMuted: { color: "#52525b" },
+  grandTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#18181b",
+    marginTop: 3,
+    paddingTop: 6,
+  },
+  grandTotalText: { fontFamily: "Helvetica-Bold", fontSize: 12 },
   depositBox: {
     marginTop: 24,
     padding: 14,
@@ -105,7 +119,7 @@ function QuotePdf({
   items: LineItem[];
   profile: Profile;
 }) {
-  const totalCents = quoteTotalCents(items);
+  const { subtotalCents, taxCents, totalCents } = quoteTotals(items, quote.tax_rate_bps);
   const depositDue = depositCents(totalCents, quote.deposit_type, quote.deposit_value);
   const issuedDate = new Date(quote.created_at).toLocaleDateString("en-US", {
     year: "numeric",
@@ -173,9 +187,23 @@ function QuotePdf({
           ))}
         </View>
 
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatCents(totalCents)}</Text>
+        <View style={styles.totalsBlock}>
+          <View style={styles.totalsRow}>
+            <Text style={styles.totalsMuted}>Subtotal</Text>
+            <Text>{formatCents(subtotalCents)}</Text>
+          </View>
+          {quote.tax_rate_bps > 0 ? (
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsMuted}>
+                Tax ({formatTaxRate(quote.tax_rate_bps)})
+              </Text>
+              <Text>{formatCents(taxCents)}</Text>
+            </View>
+          ) : null}
+          <View style={styles.grandTotalRow}>
+            <Text style={styles.grandTotalText}>Total</Text>
+            <Text style={styles.grandTotalText}>{formatCents(totalCents)}</Text>
+          </View>
         </View>
 
         <View style={styles.depositBox}>
@@ -190,6 +218,13 @@ function QuotePdf({
           </View>
           <Text style={styles.depositValue}>{formatCents(depositDue)}</Text>
         </View>
+
+        {quote.terms ? (
+          <View style={{ marginTop: 28 }}>
+            <Text style={styles.sectionLabel}>Notes &amp; terms</Text>
+            <Text style={{ lineHeight: 1.5, color: "#52525b" }}>{quote.terms}</Text>
+          </View>
+        ) : null}
 
         <Text style={styles.footer}>
           {profile.business_name} — quote #{quote.id.slice(0, 8).toUpperCase()}, issued {issuedDate}
