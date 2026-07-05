@@ -11,6 +11,8 @@ export type Profile = {
   stripe_account_id: string | null;
   deposit_type: DepositType;
   deposit_value: number;
+  default_tax_rate_bps: number;
+  default_terms: string;
   created_at: string;
   updated_at: string;
 };
@@ -26,6 +28,8 @@ export type Quote = {
   status: QuoteStatus;
   deposit_type: DepositType;
   deposit_value: number;
+  tax_rate_bps: number;
+  terms: string;
   sent_at: string | null;
   viewed_at: string | null;
   accepted_at: string | null;
@@ -45,8 +49,27 @@ export type LineItem = {
   created_at: string;
 };
 
-export function quoteTotalCents(items: Pick<LineItem, "quantity" | "unit_price_cents">[]): number {
+export function quoteSubtotalCents(
+  items: Pick<LineItem, "quantity" | "unit_price_cents">[]
+): number {
   return items.reduce((sum, item) => sum + Math.round(item.quantity * item.unit_price_cents), 0);
+}
+
+export function taxCents(subtotalCents: number, taxRateBps: number): number {
+  return Math.round((subtotalCents * taxRateBps) / 10000);
+}
+
+export function quoteTotals(
+  items: Pick<LineItem, "quantity" | "unit_price_cents">[],
+  taxRateBps: number
+): { subtotalCents: number; taxCents: number; totalCents: number } {
+  const subtotalCents = quoteSubtotalCents(items);
+  const tax = taxCents(subtotalCents, taxRateBps);
+  return { subtotalCents, taxCents: tax, totalCents: subtotalCents + tax };
+}
+
+export function formatTaxRate(taxRateBps: number): string {
+  return `${(taxRateBps / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 }
 
 export function depositCents(totalCents: number, type: DepositType, value: number): number {
