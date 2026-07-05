@@ -30,7 +30,7 @@ Sign in with a magic link, then fill in your business profile under Settings.
 
 - [x] **Phase 1:** Auth + business profile + schema (users/profiles, quotes, line_items)
 - [x] **Phase 2:** Quote builder UI + PDF generation
-- [ ] **Phase 2.5:** Sales tax + notes/terms on quotes (before the public page, so PDF and client view are built once)
+- [x] **Phase 2.5:** Sales tax + notes/terms on quotes (before the public page, so PDF and client view are built once)
 - [x] **Phase 3:** Public client-facing quote page (`/q/{token}`)
 - [ ] **Phase 4:** Stripe Connect onboarding + deposit checkout
 - [ ] **Phase 5:** Dashboard polish (duplicate quote) + email sending
