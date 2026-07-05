@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Quote } from "@/lib/types";
+import { createQuote } from "@/app/quotes/actions";
 
 const STATUS_STYLES: Record<Quote["status"], string> = {
   draft: "bg-zinc-100 text-zinc-700",
@@ -71,36 +72,42 @@ export default async function DashboardPage() {
       <section className="mt-8">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium text-zinc-900">Quotes</h2>
-          {/* Quote builder arrives in Phase 2 */}
-          <span
-            className="cursor-not-allowed rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-500"
-            title="Coming in Phase 2"
-          >
-            New quote
-          </span>
+          <form action={createQuote}>
+            <button
+              type="submit"
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+            >
+              New quote
+            </button>
+          </form>
         </div>
 
         {quotes.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-zinc-300 p-10 text-center text-sm text-zinc-500">
-            No quotes yet. The quote builder lands in Phase 2.
+            No quotes yet. Create your first one with the button above.
           </div>
         ) : (
           <ul className="mt-4 divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white">
             {quotes.map((quote) => (
-              <li key={quote.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-zinc-900">
-                    {quote.client_name || "Untitled quote"}
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    {new Date(quote.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[quote.status]}`}
+              <li key={quote.id}>
+                <Link
+                  href={`/quotes/${quote.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50"
                 >
-                  {quote.status}
-                </span>
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900">
+                      {quote.client_name || "Untitled quote"}
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      {new Date(quote.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[quote.status]}`}
+                  >
+                    {quote.status}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
