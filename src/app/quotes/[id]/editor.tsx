@@ -10,6 +10,8 @@ import {
   type LineItemKind,
   type Quote,
 } from "@/lib/types";
+import { btnPrimary, btnSecondary, card, input } from "@/lib/ui";
+import { StatusBadge } from "@/components/status-badge";
 import { deleteQuote, saveQuote } from "./actions";
 
 type EditableItem = {
@@ -18,14 +20,6 @@ type EditableItem = {
   description: string;
   quantity: string; // kept as strings while editing to avoid cursor jumps
   unitPrice: string; // dollars
-};
-
-const STATUS_STYLES: Record<Quote["status"], string> = {
-  draft: "bg-zinc-100 text-zinc-700",
-  sent: "bg-blue-100 text-blue-800",
-  viewed: "bg-amber-100 text-amber-800",
-  accepted: "bg-green-100 text-green-800",
-  paid: "bg-emerald-100 text-emerald-800",
 };
 
 let nextKey = 1;
@@ -46,8 +40,8 @@ function itemCents(item: EditableItem): number {
   return Math.round(qty * price * 100);
 }
 
-const inputClass =
-  "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none";
+const itemGrid =
+  "grid grid-cols-[6.5rem_1fr_5rem_6.5rem_5.5rem_2rem] items-center gap-2 max-sm:grid-cols-2";
 
 export function QuoteEditor({
   quote,
@@ -96,13 +90,7 @@ export function QuoteEditor({
   function addItem(kind: LineItemKind) {
     setItems((prev) => [
       ...prev,
-      {
-        key: nextKey++,
-        kind,
-        description: "",
-        quantity: "1",
-        unitPrice: "0.00",
-      },
+      { key: nextKey++, kind, description: "", quantity: "1", unitPrice: "0.00" },
     ]);
   }
 
@@ -139,36 +127,34 @@ export function QuoteEditor({
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
+    <main className="mx-auto max-w-4xl px-4 py-8">
       <div className="flex items-center justify-between">
-        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900">
-          &larr; Back to dashboard
-        </Link>
-        <span
-          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[quote.status]}`}
+        <Link
+          href="/dashboard"
+          className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
         >
-          {quote.status}
-        </span>
+          &larr; Dashboard
+        </Link>
+        <StatusBadge status={quote.status} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-zinc-900">
-          Quote {quote.id.slice(0, 8)}
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+          Quote{" "}
+          <span className="font-mono text-lg font-medium text-zinc-500">
+            #{quote.id.slice(0, 8).toUpperCase()}
+          </span>
         </h1>
         <div className="flex items-center gap-3">
           <a
             href={`/quotes/${quote.id}/pdf`}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            className={btnSecondary}
           >
             View PDF
           </a>
-          <button
-            onClick={handleSave}
-            disabled={isPending}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
-          >
+          <button onClick={handleSave} disabled={isPending} className={btnPrimary}>
             {isPending ? "Saving…" : "Save"}
           </button>
         </div>
@@ -176,27 +162,28 @@ export function QuoteEditor({
 
       {message && (
         <p
-          className={`mt-4 rounded-lg p-3 text-sm ${
+          role="status"
+          className={`mt-4 rounded-lg border p-3 text-sm font-medium ${
             message.kind === "saved"
-              ? "bg-green-50 text-green-800"
-              : "bg-red-50 text-red-700"
+              ? "border-green-200 bg-green-50 text-green-800"
+              : "border-red-200 bg-red-50 text-red-800"
           }`}
         >
           {message.text}
         </p>
       )}
 
-      <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+      <section className={`${card} mt-6 p-6`}>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
           Client
         </h2>
-        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <input
             aria-label="Client name"
             placeholder="Client name"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
-            className={inputClass}
+            className={input}
           />
           <input
             aria-label="Client email"
@@ -204,7 +191,7 @@ export function QuoteEditor({
             placeholder="client@email.com"
             value={clientEmail}
             onChange={(e) => setClientEmail(e.target.value)}
-            className={inputClass}
+            className={input}
           />
           <input
             aria-label="Client phone"
@@ -212,7 +199,7 @@ export function QuoteEditor({
             placeholder="Phone"
             value={clientPhone}
             onChange={(e) => setClientPhone(e.target.value)}
-            className={inputClass}
+            className={input}
           />
         </div>
         <textarea
@@ -221,28 +208,36 @@ export function QuoteEditor({
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
           rows={3}
-          className={`mt-4 ${inputClass}`}
+          className={`mt-4 ${input}`}
         />
       </section>
 
-      <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+      <section className={`${card} mt-6 p-6`}>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
           Line items
         </h2>
 
-        <div className="mt-3 space-y-3">
+        <div
+          className={`${itemGrid} mt-4 text-xs font-semibold uppercase tracking-wide text-zinc-500 max-sm:hidden`}
+        >
+          <span>Type</span>
+          <span>Description</span>
+          <span>Qty / hrs</span>
+          <span>Rate / cost</span>
+          <span className="text-right">Amount</span>
+          <span />
+        </div>
+
+        <div className="mt-2 space-y-2">
           {items.map((item) => (
-            <div
-              key={item.key}
-              className="grid grid-cols-[6rem_1fr_4.5rem_6rem_6rem_2rem] items-center gap-2 max-sm:grid-cols-2"
-            >
+            <div key={item.key} className={itemGrid}>
               <select
                 aria-label="Item type"
                 value={item.kind}
                 onChange={(e) =>
                   updateItem(item.key, { kind: e.target.value as LineItemKind })
                 }
-                className={inputClass}
+                className={input}
               >
                 <option value="labor">Labor</option>
                 <option value="material">Material</option>
@@ -252,20 +247,19 @@ export function QuoteEditor({
                 placeholder={item.kind === "labor" ? "Work performed" : "Material / part"}
                 value={item.description}
                 onChange={(e) => updateItem(item.key, { description: e.target.value })}
-                className={inputClass}
+                className={input}
               />
               <input
                 aria-label={item.kind === "labor" ? "Hours" : "Quantity"}
                 type="number"
                 min="0"
                 step="0.25"
-                title={item.kind === "labor" ? "Hours" : "Quantity"}
                 value={item.quantity}
                 onChange={(e) => updateItem(item.key, { quantity: e.target.value })}
-                className={inputClass}
+                className={input}
               />
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
                   $
                 </span>
                 <input
@@ -273,19 +267,18 @@ export function QuoteEditor({
                   type="number"
                   min="0"
                   step="0.01"
-                  title={item.kind === "labor" ? "Hourly rate" : "Unit cost"}
                   value={item.unitPrice}
                   onChange={(e) => updateItem(item.key, { unitPrice: e.target.value })}
-                  className={`${inputClass} pl-7`}
+                  className={`${input} pl-7`}
                 />
               </div>
-              <p className="text-right text-sm font-medium text-zinc-900 max-sm:text-left">
+              <p className="text-right text-sm font-semibold tabular-nums text-zinc-900 max-sm:text-left">
                 {formatCents(itemCents(item))}
               </p>
               <button
                 aria-label="Remove item"
                 onClick={() => removeItem(item.key)}
-                className="text-zinc-400 hover:text-red-600"
+                className="justify-self-center rounded p-1 text-lg leading-none text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-700"
               >
                 &times;
               </button>
@@ -294,33 +287,30 @@ export function QuoteEditor({
         </div>
 
         <div className="mt-4 flex gap-3">
-          <button
-            onClick={() => addItem("labor")}
-            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-          >
+          <button onClick={() => addItem("labor")} className={btnSecondary}>
             + Labor
           </button>
-          <button
-            onClick={() => addItem("material")}
-            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-          >
+          <button onClick={() => addItem("material")} className={btnSecondary}>
             + Material
           </button>
         </div>
 
-        <div className="mt-6 border-t border-zinc-200 pt-4">
-          <div className="flex items-center justify-between text-base font-semibold text-zinc-900">
-            <span>Total</span>
-            <span>{formatCents(totalCents)}</span>
+        <div className="mt-6 space-y-4 border-t border-zinc-200 pt-5">
+          <div className="flex items-center justify-between">
+            <span className="text-base font-semibold text-zinc-900">Total</span>
+            <span className="text-xl font-bold tabular-nums text-zinc-900">
+              {formatCents(totalCents)}
+            </span>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-zinc-600">Deposit:</span>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-50 p-4 ring-1 ring-inset ring-blue-100">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-blue-950">Deposit:</span>
               <select
                 aria-label="Deposit type"
                 value={depositType}
                 onChange={(e) => setDepositType(e.target.value as DepositType)}
-                className="rounded-lg border border-zinc-300 px-2 py-1.5 text-sm focus:border-zinc-900 focus:outline-none"
+                className="rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20"
               >
                 <option value="percent">% of total</option>
                 <option value="fixed">Fixed $</option>
@@ -332,12 +322,12 @@ export function QuoteEditor({
                 step={depositType === "fixed" ? "0.01" : "1"}
                 value={depositValue}
                 onChange={(e) => setDepositValue(e.target.value)}
-                className="w-24 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm focus:border-zinc-900 focus:outline-none"
+                className="w-24 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20"
               />
             </div>
-            <div className="text-sm text-zinc-600">
+            <div className="text-sm text-blue-950">
               Deposit due:{" "}
-              <span className="font-semibold text-zinc-900">
+              <span className="text-base font-bold tabular-nums">
                 {formatCents(depositDueCents)}
               </span>
             </div>
@@ -349,7 +339,7 @@ export function QuoteEditor({
         <form action={deleteQuote.bind(null, quote.id)}>
           <button
             type="submit"
-            className="text-sm text-red-600 hover:text-red-800"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
           >
             Delete quote
           </button>

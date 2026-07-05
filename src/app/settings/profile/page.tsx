@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
+import { AppHeader } from "@/components/app-header";
+import { btnPrimary, card, input, label } from "@/lib/ui";
 import { updateProfile } from "./actions";
 
 export default async function ProfileSettingsPage({
@@ -30,117 +31,116 @@ export default async function ProfileSettingsPage({
       : String(profile?.deposit_value ?? 25);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
-      <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900">
-        &larr; Back to dashboard
-      </Link>
-      <h1 className="mt-4 text-2xl font-semibold text-zinc-900">
-        Business profile
-      </h1>
-      <p className="mt-1 text-sm text-zinc-500">
-        This info appears on every quote you send.
-      </p>
-
-      {saved && (
-        <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">
-          Profile saved.
+    <>
+      <AppHeader email={user.email} />
+      <main className="mx-auto max-w-2xl px-4 py-8">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+          Business profile
+        </h1>
+        <p className="mt-1 text-sm text-zinc-600">
+          This info appears on every quote you send.
         </p>
-      )}
-      {error && (
-        <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </p>
-      )}
 
-      <form action={updateProfile} className="mt-6 space-y-5">
-        <div>
-          <label htmlFor="business_name" className="block text-sm font-medium text-zinc-700">
-            Business name
-          </label>
-          <input
-            id="business_name"
-            name="business_name"
-            type="text"
-            required
-            defaultValue={profile?.business_name ?? ""}
-            placeholder="Smith Plumbing LLC"
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div>
-            <label htmlFor="contact_email" className="block text-sm font-medium text-zinc-700">
-              Contact email
-            </label>
-            <input
-              id="contact_email"
-              name="contact_email"
-              type="email"
-              defaultValue={profile?.contact_email ?? ""}
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-zinc-700">
-              Phone
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              defaultValue={profile?.phone ?? ""}
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <fieldset className="rounded-lg border border-zinc-200 p-4">
-          <legend className="px-1 text-sm font-medium text-zinc-700">
-            Default deposit
-          </legend>
-          <p className="text-xs text-zinc-500">
-            Applied to new quotes. You can change it per quote later.
+        {saved && (
+          <p className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-800">
+            Profile saved.
           </p>
-          <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        )}
+        {error && (
+          <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-800">
+            {error}
+          </p>
+        )}
+
+        <form action={updateProfile} className={`${card} mt-6 space-y-6 p-6`}>
+          <div>
+            <label htmlFor="business_name" className={label}>
+              Business name
+            </label>
+            <input
+              id="business_name"
+              name="business_name"
+              type="text"
+              required
+              defaultValue={profile?.business_name ?? ""}
+              placeholder="Smith Plumbing LLC"
+              className={`mt-1.5 ${input}`}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-              <label htmlFor="deposit_type" className="block text-sm font-medium text-zinc-700">
-                Type
-              </label>
-              <select
-                id="deposit_type"
-                name="deposit_type"
-                defaultValue={profile?.deposit_type ?? "percent"}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
-              >
-                <option value="percent">Percent of total</option>
-                <option value="fixed">Fixed amount ($)</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="deposit_value" className="block text-sm font-medium text-zinc-700">
-                Value
+              <label htmlFor="contact_email" className={label}>
+                Contact email
               </label>
               <input
-                id="deposit_value"
-                name="deposit_value"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue={depositDisplay}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-900 focus:outline-none"
+                id="contact_email"
+                name="contact_email"
+                type="email"
+                defaultValue={profile?.contact_email ?? ""}
+                className={`mt-1.5 ${input}`}
+              />
+            </div>
+            <div>
+              <label htmlFor="phone" className={label}>
+                Phone
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                defaultValue={profile?.phone ?? ""}
+                className={`mt-1.5 ${input}`}
               />
             </div>
           </div>
-        </fieldset>
 
-        <button
-          type="submit"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-        >
-          Save profile
-        </button>
-      </form>
-    </main>
+          <fieldset className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+            <legend className="px-1 text-sm font-semibold text-zinc-800">
+              Default deposit
+            </legend>
+            <p className="text-xs text-zinc-600">
+              Applied to new quotes — you can adjust it on each quote too.
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <label htmlFor="deposit_type" className={label}>
+                  Type
+                </label>
+                <select
+                  id="deposit_type"
+                  name="deposit_type"
+                  defaultValue={profile?.deposit_type ?? "percent"}
+                  className={`mt-1.5 ${input}`}
+                >
+                  <option value="percent">Percent of total</option>
+                  <option value="fixed">Fixed amount ($)</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="deposit_value" className={label}>
+                  Value
+                </label>
+                <input
+                  id="deposit_value"
+                  name="deposit_value"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue={depositDisplay}
+                  className={`mt-1.5 ${input}`}
+                />
+              </div>
+            </div>
+          </fieldset>
+
+          <div className="flex justify-end">
+            <button type="submit" className={btnPrimary}>
+              Save profile
+            </button>
+          </div>
+        </form>
+      </main>
+    </>
   );
 }

@@ -3,14 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Quote } from "@/lib/types";
 import { createQuote } from "@/app/quotes/actions";
-
-const STATUS_STYLES: Record<Quote["status"], string> = {
-  draft: "bg-zinc-100 text-zinc-700",
-  sent: "bg-blue-100 text-blue-800",
-  viewed: "bg-amber-100 text-amber-800",
-  accepted: "bg-green-100 text-green-800",
-  paid: "bg-emerald-100 text-emerald-800",
-};
+import { AppHeader } from "@/components/app-header";
+import { StatusBadge } from "@/components/status-badge";
+import { btnPrimary, card } from "@/lib/ui";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -33,86 +28,93 @@ export default async function DashboardPage() {
   const needsProfile = !profile?.business_name;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">
-            {profile?.business_name || "Your quotes"}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">{user.email}</p>
-        </div>
-        <nav className="flex items-center gap-3">
-          <Link
-            href="/settings/profile"
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          >
-            Settings
-          </Link>
-          <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-            >
-              Sign out
-            </button>
-          </form>
-        </nav>
-      </header>
-
-      {needsProfile && (
-        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Finish setting up your{" "}
-          <Link href="/settings/profile" className="font-medium underline">
-            business profile
-          </Link>{" "}
-          — it appears on every quote you send.
-        </div>
-      )}
-
-      <section className="mt-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-zinc-900">Quotes</h2>
-          <form action={createQuote}>
-            <button
-              type="submit"
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-            >
-              New quote
-            </button>
-          </form>
-        </div>
-
-        {quotes.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-zinc-300 p-10 text-center text-sm text-zinc-500">
-            No quotes yet. Create your first one with the button above.
+    <>
+      <AppHeader email={user.email} />
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+              {profile?.business_name || "Your quotes"}
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600">
+              {quotes.length === 0
+                ? "Create a quote and send it to your client in minutes."
+                : `${quotes.length} quote${quotes.length === 1 ? "" : "s"}`}
+            </p>
           </div>
-        ) : (
-          <ul className="mt-4 divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white">
-            {quotes.map((quote) => (
-              <li key={quote.id}>
-                <Link
-                  href={`/quotes/${quote.id}`}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-zinc-900">
-                      {quote.client_name || "Untitled quote"}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      {new Date(quote.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[quote.status]}`}
-                  >
-                    {quote.status}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <form action={createQuote}>
+            <button type="submit" className={btnPrimary}>
+              + New quote
+            </button>
+          </form>
+        </div>
+
+        {needsProfile && (
+          <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            <span aria-hidden className="mt-0.5">⚠️</span>
+            <p>
+              Finish setting up your{" "}
+              <Link
+                href="/settings/profile"
+                className="font-semibold text-amber-950 underline underline-offset-2 hover:text-amber-800"
+              >
+                business profile
+              </Link>{" "}
+              — your business name and contact info appear on every quote you
+              send.
+            </p>
+          </div>
         )}
-      </section>
-    </main>
+
+        <section className="mt-8">
+          {quotes.length === 0 ? (
+            <div className={`${card} border-dashed p-12 text-center`}>
+              <p className="text-4xl" aria-hidden>
+                🧾
+              </p>
+              <h2 className="mt-3 text-base font-semibold text-zinc-900">
+                No quotes yet
+              </h2>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-600">
+                Hit “New quote” to build your first itemized quote — you can
+                preview the PDF before anything is sent.
+              </p>
+            </div>
+          ) : (
+            <ul className={`${card} divide-y divide-zinc-100 overflow-hidden`}>
+              {quotes.map((quote) => (
+                <li key={quote.id}>
+                  <Link
+                    href={`/quotes/${quote.id}`}
+                    className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-zinc-50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-zinc-900">
+                        {quote.client_name || "Untitled quote"}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-zinc-500">
+                        {quote.job_description || "No description"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-4">
+                      <span className="hidden text-xs text-zinc-500 sm:inline">
+                        {new Date(quote.created_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <StatusBadge status={quote.status} />
+                      <span aria-hidden className="text-zinc-300">
+                        ›
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+    </>
   );
 }
