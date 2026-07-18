@@ -1,9 +1,23 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getStripe } from "@/lib/stripe";
 import type { Profile } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
-import { btnPrimary, card, input, label } from "@/lib/ui";
-import { updateProfile } from "./actions";
+import { btnPrimary, btnSecondary, card, input, label } from "@/lib/ui";
+import { connectStripe, updateProfile } from "./actions";
+
+type StripeStatus = "none" | "incomplete" | "ready" | "unavailable";
+
+async function getStripeStatus(profile: Profile | null): Promise<StripeStatus> {
+  if (!profile?.stripe_account_id) return "none";
+  try {
+    const account = await getStripe().accounts.retrieve(profile.stripe_account_id);
+    return account.charges_enabled ? "ready" : "incomplete";
+  } catch {
+    // Key missing or Stripe unreachable — don't break the settings page.
+    return "unavailable";
+  }
+}
 
 export default async function ProfileSettingsPage({
   searchParams,
@@ -29,6 +43,7 @@ export default async function ProfileSettingsPage({
     profile?.deposit_type === "fixed"
       ? (profile.deposit_value / 100).toFixed(2)
       : String(profile?.deposit_value ?? 25);
+  const stripeStatus = await getStripeStatus(profile);
 
   return (
     <>
@@ -178,6 +193,59 @@ export default async function ProfileSettingsPage({
             </button>
           </div>
         </form>
+
+        <section className={`${card} mt-6 p-6`}>
+          <h2 className="text-base font-semibold text-zinc-900">Payments</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Connect your own Stripe account so clients can pay deposits online.
+            Money goes directly to you — never through Quote.
+          </p>
+
+          <div className="mt-4">
+            {stripeStatus === "ready" && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
+                  <span className="h-2 w-2 rounded-full bg-green-600" />
+                  Connected — ready to accept deposits
+                </p>
+                <a
+                  href="https://dashboard.stripe.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={btnSecondary}
+                >
+                  Open Stripe dashboard
+                </a>
+              </div>
+            )}
+            {stripeStatus === "incomplete" && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                  Onboarding started but not finished — deposits can&apos;t be
+                  accepted yet.
+                </p>
+                <form action={connectStripe}>
+                  <button type="submit" className={btnPrimary}>
+                    Finish Stripe setup
+                  </button>
+                </form>
+              </div>
+            )}
+            {stripeStatus === "none" && (
+              <form action={connectStripe}>
+                <button type="submit" className={btnPrimary}>
+                  Connect Stripe
+                </button>
+              </form>
+            )}
+            {stripeStatus === "unavailable" && (
+              <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+                Stripe status couldn&apos;t be checked right now. Try again in a
+                minute.
+              </p>
+            )}
+          </div>
+        </section>
       </main>
     </>
   );
