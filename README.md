@@ -47,3 +47,12 @@ Sign in with a magic link, then fill in your business profile under Settings.
 - A DB trigger auto-creates a `profiles` row on signup.
 - Auth-session refresh and route protection live in `src/proxy.ts`
   (Next 16's replacement for `middleware.ts`).
+- **Payments:** Stripe Connect **Standard** accounts with **direct charges** —
+  deposits are charged on the tradesperson's own Stripe account (created via
+  `connectStripe`, onboarded with Account Links). The platform never holds
+  client money and takes no per-payment fee (monetization = flat subscription).
+  Payment confirmation is dual-path: the Checkout success redirect verifies the
+  session server-side (instant, works in dev), and `/api/stripe/webhook`
+  (`checkout.session.completed`, with "listen to connected accounts" enabled)
+  is the production-authoritative path. Both funnel through the idempotent
+  `markQuotePaid`.

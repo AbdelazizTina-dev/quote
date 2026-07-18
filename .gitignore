@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local npm cache workaround
 .npm-cache/
+
+# template is safe to commit
+!.env.example
