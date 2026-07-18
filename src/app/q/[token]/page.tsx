@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { markQuotePaid } from "@/lib/payments";
+import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   depositCents,
@@ -14,6 +16,34 @@ import {
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
+
+// Fast path for dev and instant UX: verify the Checkout session on the
+// success redirect. The webhook covers the case where the client closes
+// the tab before returning.
+async function verifyPayment(
+  quote: Quote,
+  profile: Profile,
+  sessionId: string
+): Promise<boolean> {
+  if (!profile.stripe_account_id) return false;
+  try {
+    const session = await getStripe().checkout.sessions.retrieve(
+      sessionId,
+      {},
+      { stripeAccount: profile.stripe_account_id }
+    );
+    if (
+      session.payment_status === "paid" &&
+      session.metadata?.quote_id === quote.id
+    ) {
+      await markQuotePaid(quote.id);
+      return true;
+    }
+  } catch {
+    // Bad/foreign session id — ignore; the webhook remains authoritative.
+  }
+  return false;
+}
 
 async function loadQuote(token: string) {
   const admin = createAdminClient();
@@ -55,14 +85,24 @@ async function loadQuote(token: string) {
 
 export default async function PublicQuotePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ session_id?: string; error?: string }>;
 }) {
   const { token } = await params;
+  const { session_id: sessionId, error } = await searchParams;
   const data = await loadQuote(token);
   if (!data) notFound();
 
   const { quote, items, profile } = data;
+
+  let justPaid = false;
+  if (sessionId && quote.status !== "paid") {
+    justPaid = await verifyPayment(quote, profile, sessionId);
+    if (justPaid) quote.status = "paid";
+  }
+  const isPaid = quote.status === "paid";
   const { subtotalCents, taxCents, totalCents } = quoteTotals(
     items,
     quote.tax_rate_bps
@@ -78,8 +118,29 @@ export default async function PublicQuotePage({
     day: "numeric",
   });
 
+  const payable =
+    !isPaid && !!profile.stripe_account_id && depositDue >= 50;
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
+      {justPaid && (
+        <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-center">
+          <p className="text-base font-semibold text-green-800">
+            ✓ Deposit received — thank you!
+          </p>
+          <p className="mt-1 text-sm text-green-700">
+            {profile.business_name} has been notified and will be in touch to
+            schedule the work.
+          </p>
+        </div>
+      )}
+      {error && !isPaid && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-center text-sm font-medium text-red-800">
+          {error === "checkout-failed"
+            ? "Something went wrong starting the payment. Please try again."
+            : "Online payment isn't available for this quote right now."}
+        </div>
+      )}
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-10">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -173,33 +234,72 @@ export default async function PublicQuotePage({
           </div>
         </div>
 
-        <div className="mt-8 rounded-xl bg-blue-50 p-5 ring-1 ring-inset ring-blue-100">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-blue-950">
-                Deposit due to accept
-              </p>
-              <p className="mt-0.5 text-xs text-blue-900/70">
-                {quote.deposit_type === "percent"
-                  ? `${quote.deposit_value}% of total`
-                  : "Fixed deposit"}{" "}
-                — remainder due on completion
+        {isPaid ? (
+          <div className="mt-8 rounded-xl bg-green-50 p-5 ring-1 ring-inset ring-green-200">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-green-900">
+                  ✓ Quote accepted — deposit paid
+                </p>
+                <p className="mt-0.5 text-xs text-green-800/80">
+                  {quote.paid_at
+                    ? `Paid ${new Date(quote.paid_at).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}`
+                    : "Payment received"}{" "}
+                  — remainder due on completion
+                </p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-green-900">
+                {formatCents(depositDue)}
               </p>
             </div>
-            <p className="text-2xl font-bold tabular-nums text-blue-950">
-              {formatCents(depositDue)}
-            </p>
           </div>
-          {/* Phase 4: "Accept & pay deposit" via Stripe Checkout renders here */}
-          <p className="mt-3 text-xs text-blue-900/70">
-            To accept this quote, contact {profile.business_name}
-            {profile.phone ? ` at ${profile.phone}` : ""}
-            {!profile.phone && profile.contact_email
-              ? ` at ${profile.contact_email}`
-              : ""}
-            . Online acceptance and deposit payment are coming soon.
-          </p>
-        </div>
+        ) : (
+          <div className="mt-8 rounded-xl bg-blue-50 p-5 ring-1 ring-inset ring-blue-100">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-blue-950">
+                  Deposit due to accept
+                </p>
+                <p className="mt-0.5 text-xs text-blue-900/70">
+                  {quote.deposit_type === "percent"
+                    ? `${quote.deposit_value}% of total`
+                    : "Fixed deposit"}{" "}
+                  — remainder due on completion
+                </p>
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-blue-950">
+                {formatCents(depositDue)}
+              </p>
+            </div>
+            {payable ? (
+              <form method="POST" action={`/q/${quote.token}/checkout`} className="mt-4">
+                <button
+                  type="submit"
+                  className="w-full rounded-lg bg-blue-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                >
+                  Accept &amp; pay {formatCents(depositDue)} deposit
+                </button>
+                <p className="mt-2 text-center text-xs text-blue-900/70">
+                  Secure payment via Stripe. Paid directly to{" "}
+                  {profile.business_name}.
+                </p>
+              </form>
+            ) : (
+              <p className="mt-3 text-xs text-blue-900/70">
+                To accept this quote, contact {profile.business_name}
+                {profile.phone ? ` at ${profile.phone}` : ""}
+                {!profile.phone && profile.contact_email
+                  ? ` at ${profile.contact_email}`
+                  : ""}
+                .
+              </p>
+            )}
+          </div>
+        )}
 
         {quote.terms && (
           <div className="mt-8 border-t border-zinc-100 pt-6">
