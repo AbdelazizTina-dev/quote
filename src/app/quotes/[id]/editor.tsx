@@ -14,7 +14,14 @@ import {
 } from "@/lib/types";
 import { btnPrimary, btnSecondary, card, input } from "@/lib/ui";
 import { StatusBadge } from "@/components/status-badge";
-import { deleteQuote, markSent, saveQuote } from "./actions";
+import {
+  deleteQuote,
+  duplicateQuote,
+  markSent,
+  saveQuote,
+  sendQuote,
+  type QuotePayload,
+} from "./actions";
 
 type EditableItem = {
   key: number;
@@ -124,33 +131,55 @@ export function QuoteEditor({
     }
   }
 
+  function buildPayload(): QuotePayload {
+    return {
+      client_name: clientName,
+      client_email: clientEmail,
+      client_phone: clientPhone,
+      job_description: jobDescription,
+      deposit_type: depositType,
+      deposit_value:
+        depositType === "fixed"
+          ? Math.round((parseFloat(depositValue) || 0) * 100)
+          : Math.round(parseFloat(depositValue) || 0),
+      tax_rate_bps: taxRateBps,
+      terms,
+      items: items.map((item) => ({
+        kind: item.kind,
+        description: item.description,
+        quantity: parseFloat(item.quantity) || 0,
+        unit_price_cents: Math.round((parseFloat(item.unitPrice) || 0) * 100),
+      })),
+    };
+  }
+
   function handleSave() {
     setMessage(null);
     startTransition(async () => {
-      const result = await saveQuote(quote.id, {
-        client_name: clientName,
-        client_email: clientEmail,
-        client_phone: clientPhone,
-        job_description: jobDescription,
-        deposit_type: depositType,
-        deposit_value:
-          depositType === "fixed"
-            ? Math.round((parseFloat(depositValue) || 0) * 100)
-            : Math.round(parseFloat(depositValue) || 0),
-        tax_rate_bps: taxRateBps,
-        terms,
-        items: items.map((item) => ({
-          kind: item.kind,
-          description: item.description,
-          quantity: parseFloat(item.quantity) || 0,
-          unit_price_cents: Math.round((parseFloat(item.unitPrice) || 0) * 100),
-        })),
-      });
+      const result = await saveQuote(quote.id, buildPayload());
       setMessage(
         result.ok
           ? { kind: "saved", text: "Quote saved." }
           : { kind: "error", text: result.error }
       );
+    });
+  }
+
+  function handleEmailQuote() {
+    setMessage(null);
+    startTransition(async () => {
+      const saved = await saveQuote(quote.id, buildPayload());
+      if (!saved.ok) {
+        setMessage({ kind: "error", text: saved.error });
+        return;
+      }
+      const sent = await sendQuote(quote.id);
+      if (sent.ok) {
+        setMessage({ kind: "saved", text: `Quote emailed to ${clientEmail}.` });
+        router.refresh();
+      } else {
+        setMessage({ kind: "error", text: sent.error });
+      }
     });
   }
 
@@ -174,6 +203,11 @@ export function QuoteEditor({
           </span>
         </h1>
         <div className="flex items-center gap-3">
+          <form action={duplicateQuote.bind(null, quote.id)}>
+            <button type="submit" className={btnSecondary}>
+              Duplicate
+            </button>
+          </form>
           <a
             href={`/quotes/${quote.id}/pdf`}
             target="_blank"
@@ -221,6 +255,14 @@ export function QuoteEditor({
           )}
           <button onClick={handleCopyLink} className={btnSecondary}>
             {copied ? "Copied ✓" : "Copy client link"}
+          </button>
+          <button
+            onClick={handleEmailQuote}
+            disabled={isPending || !clientEmail.trim()}
+            title={!clientEmail.trim() ? "Add the client's email first" : undefined}
+            className={btnPrimary}
+          >
+            {isPending ? "Working…" : "Email to client"}
           </button>
         </div>
         {quote.status === "draft" && (
