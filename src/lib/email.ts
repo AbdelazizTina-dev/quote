@@ -1,8 +1,14 @@
-// Postmark via its plain HTTP API — no SDK dependency.
-// All senders degrade gracefully when POSTMARK_SERVER_TOKEN / EMAIL_FROM
-// aren't configured: quote emails report the problem, notifications no-op.
+// Resend via its plain HTTP API — no SDK dependency.
+// (Postmark requires a company email domain to even register an account.)
+// All senders degrade gracefully when RESEND_API_KEY isn't configured:
+// quote emails report the problem, notifications no-op.
 
 type SendResult = { ok: true } | { ok: false; error: string };
+
+// Resend's shared test sender works with no domain setup, but only
+// delivers to the address that owns the Resend account. Verify a domain
+// and set EMAIL_FROM to send to real clients.
+const DEFAULT_FROM = "Quote <onboarding@resend.dev>";
 
 export function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -14,36 +20,33 @@ export async function sendEmail(params: {
   html: string;
   text: string;
 }): Promise<SendResult> {
-  const token = process.env.POSTMARK_SERVER_TOKEN;
-  const from = process.env.EMAIL_FROM;
-  if (!token || !from) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
     return {
       ok: false,
       error:
-        "Email isn't configured yet (set POSTMARK_SERVER_TOKEN and EMAIL_FROM). Copy the client link instead.",
+        "Email isn't configured yet (set RESEND_API_KEY). Copy the client link instead.",
     };
   }
 
   try {
-    const res = await fetch("https://api.postmarkapp.com/email", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        "X-Postmark-Server-Token": token,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        Accept: "application/json",
       },
       body: JSON.stringify({
-        From: from,
-        To: params.to,
-        Subject: params.subject,
-        HtmlBody: params.html,
-        TextBody: params.text,
-        MessageStream: "outbound",
+        from: process.env.EMAIL_FROM ?? DEFAULT_FROM,
+        to: [params.to],
+        subject: params.subject,
+        html: params.html,
+        text: params.text,
       }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { Message?: string } | null;
-      return { ok: false, error: body?.Message ?? `Email failed (${res.status})` };
+      const body = (await res.json().catch(() => null)) as { message?: string } | null;
+      return { ok: false, error: body?.message ?? `Email failed (${res.status})` };
     }
     return { ok: true };
   } catch {
