@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
+import { notifyOwner } from "@/lib/notify";
 import { markQuotePaid } from "@/lib/payments";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -68,12 +70,16 @@ async function loadQuote(token: string) {
 
   // First open by the client: sent -> viewed.
   if (quote.status === "sent") {
-    await admin
+    const { data: flipped } = await admin
       .from("quotes")
       .update({ status: "viewed", viewed_at: new Date().toISOString() })
       .eq("id", quote.id)
-      .eq("status", "sent");
+      .eq("status", "sent")
+      .select("id");
     quote.status = "viewed";
+    if (flipped && flipped.length > 0) {
+      after(() => notifyOwner(quote.id, "viewed"));
+    }
   }
 
   return {
