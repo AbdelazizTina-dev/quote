@@ -1,13 +1,37 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, Quote } from "@/lib/types";
+import {
+  depositCents,
+  formatCents,
+  quoteTotals,
+  type LineItem,
+  type Profile,
+  type Quote,
+  type QuoteStatus,
+} from "@/lib/types";
 import { createQuote } from "@/app/quotes/actions";
 import { AppHeader } from "@/components/app-header";
 import { StatusBadge } from "@/components/status-badge";
 import { btnPrimary, card } from "@/lib/ui";
 
-export default async function DashboardPage() {
+type QuoteRow = Quote & {
+  line_items: Pick<LineItem, "quantity" | "unit_price_cents">[];
+};
+
+const FILTERS: { key: string; label: string; statuses: QuoteStatus[] }[] = [
+  { key: "all", label: "All", statuses: ["draft", "sent", "viewed", "accepted", "paid"] },
+  { key: "draft", label: "Drafts", statuses: ["draft"] },
+  { key: "open", label: "Awaiting reply", statuses: ["sent", "viewed"] },
+  { key: "paid", label: "Accepted & paid", statuses: ["accepted", "paid"] },
+];
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const { filter = "all" } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -19,11 +43,35 @@ export default async function DashboardPage() {
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
       .from("quotes")
-      .select("*")
+      .select("*, line_items(quantity, unit_price_cents)")
       .order("created_at", { ascending: false }),
   ]);
   const profile = profileData as Profile | null;
-  const quotes = (quotesData ?? []) as Quote[];
+  const quotes = (quotesData ?? []) as QuoteRow[];
+
+  const withTotals = quotes.map((quote) => {
+    const { totalCents } = quoteTotals(quote.line_items, quote.tax_rate_bps);
+    return { quote, totalCents };
+  });
+
+  const openValue = withTotals
+    .filter(({ quote }) => quote.status === "sent" || quote.status === "viewed")
+    .reduce((sum, { totalCents }) => sum + totalCents, 0);
+  const wonValue = withTotals
+    .filter(({ quote }) => quote.status === "accepted" || quote.status === "paid")
+    .reduce((sum, { totalCents }) => sum + totalCents, 0);
+  const depositsCollected = withTotals
+    .filter(({ quote }) => quote.status === "paid")
+    .reduce(
+      (sum, { quote, totalCents }) =>
+        sum + depositCents(totalCents, quote.deposit_type, quote.deposit_value),
+      0
+    );
+
+  const activeFilter = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
+  const visible = withTotals.filter(({ quote }) =>
+    activeFilter.statuses.includes(quote.status)
+  );
 
   const needsProfile = !profile?.business_name;
 
@@ -66,7 +114,54 @@ export default async function DashboardPage() {
           </div>
         )}
 
+        {quotes.length > 0 && (
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className={`${card} p-4`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Awaiting reply
+              </p>
+              <p className="mt-1 text-xl font-bold tabular-nums text-zinc-900">
+                {formatCents(openValue)}
+              </p>
+            </div>
+            <div className={`${card} p-4`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Work won
+              </p>
+              <p className="mt-1 text-xl font-bold tabular-nums text-zinc-900">
+                {formatCents(wonValue)}
+              </p>
+            </div>
+            <div className={`${card} p-4`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Deposits collected
+              </p>
+              <p className="mt-1 text-xl font-bold tabular-nums text-green-700">
+                {formatCents(depositsCollected)}
+              </p>
+            </div>
+          </div>
+        )}
+
         <section className="mt-8">
+          {quotes.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {FILTERS.map((f) => (
+                <Link
+                  key={f.key}
+                  href={f.key === "all" ? "/dashboard" : `/dashboard?filter=${f.key}`}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    activeFilter.key === f.key
+                      ? "bg-zinc-900 text-white"
+                      : "bg-white text-zinc-700 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-100"
+                  }`}
+                >
+                  {f.label}
+                </Link>
+              ))}
+            </div>
+          )}
+
           {quotes.length === 0 ? (
             <div className={`${card} border-dashed p-12 text-center`}>
               <p className="text-4xl" aria-hidden>
@@ -80,9 +175,13 @@ export default async function DashboardPage() {
                 preview the PDF before anything is sent.
               </p>
             </div>
+          ) : visible.length === 0 ? (
+            <div className={`${card} border-dashed p-10 text-center text-sm text-zinc-600`}>
+              No quotes match this filter.
+            </div>
           ) : (
             <ul className={`${card} divide-y divide-zinc-100 overflow-hidden`}>
-              {quotes.map((quote) => (
+              {visible.map(({ quote, totalCents }) => (
                 <li key={quote.id}>
                   <Link
                     href={`/quotes/${quote.id}`}
@@ -102,6 +201,9 @@ export default async function DashboardPage() {
                           month: "short",
                           day: "numeric",
                         })}
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums text-zinc-900">
+                        {formatCents(totalCents)}
                       </span>
                       <StatusBadge status={quote.status} />
                       <span aria-hidden className="text-zinc-300">
