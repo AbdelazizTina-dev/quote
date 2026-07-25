@@ -13,6 +13,9 @@ export type Profile = {
   deposit_value: number;
   default_tax_rate_bps: number;
   default_terms: string;
+  stripe_customer_id: string | null;
+  subscription_status: string;
+  subscription_period_end: string | null;
   created_at: string;
   updated_at: string;
 };
