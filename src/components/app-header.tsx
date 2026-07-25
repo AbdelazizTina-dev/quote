@@ -25,6 +25,12 @@ export function AppHeader({ email }: { email?: string | null }) {
           >
             Settings
           </Link>
+          <Link
+            href="/settings/billing"
+            className="rounded-lg px-3 py-1.5 font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
+          >
+            Billing
+          </Link>
           <span className="mx-2 hidden text-zinc-300 sm:inline">|</span>
           {email && (
             <span className="hidden max-w-40 truncate text-zinc-500 sm:inline" title={email}>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { accessInfo } from "@/lib/billing";
 import { createClient } from "@/lib/supabase/server";
 import {
   depositCents,
@@ -74,6 +75,7 @@ export default async function DashboardPage({
   );
 
   const needsProfile = !profile?.business_name;
+  const access = profile ? accessInfo(profile) : null;
 
   return (
     <>
@@ -97,6 +99,32 @@ export default async function DashboardPage({
           </form>
         </div>
 
+        {access && !access.active && (
+          <div className="mt-6 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-950">
+            Your free trial has ended — existing quotes and client links still
+            work, but creating and sending is paused.{" "}
+            <Link
+              href="/settings/billing"
+              className="font-semibold underline underline-offset-2"
+            >
+              Subscribe to continue
+            </Link>
+            .
+          </div>
+        )}
+        {access && access.active && !access.subscribed && access.trialDaysLeft <= 7 && (
+          <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            {access.trialDaysLeft} day{access.trialDaysLeft === 1 ? "" : "s"}{" "}
+            left in your free trial.{" "}
+            <Link
+              href="/settings/billing"
+              className="font-semibold underline underline-offset-2"
+            >
+              Subscribe
+            </Link>{" "}
+            to keep quoting without interruption.
+          </div>
+        )}
         {needsProfile && (
           <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
             <span aria-hidden className="mt-0.5">⚠️</span>

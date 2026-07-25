@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { accessInfo } from "@/lib/billing";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 
@@ -14,13 +15,14 @@ export async function createQuote() {
   // New quotes inherit the profile's default deposit, tax, and terms.
   const { data: profileData } = await supabase
     .from("profiles")
-    .select("deposit_type, deposit_value, default_tax_rate_bps, default_terms")
+    .select("*")
     .eq("id", user.id)
     .single();
-  const profile = profileData as Pick<
-    Profile,
-    "deposit_type" | "deposit_value" | "default_tax_rate_bps" | "default_terms"
-  > | null;
+  const profile = profileData as Profile | null;
+
+  if (profile && !accessInfo(profile).active) {
+    redirect("/settings/billing?locked=1");
+  }
 
   const { data, error } = await supabase
     .from("quotes")

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { accessInfo, LOCKED_MESSAGE } from "@/lib/billing";
 import { appUrl, quoteEmail, sendEmail } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -109,6 +110,9 @@ export async function sendQuote(quoteId: string): Promise<SaveResult> {
   const quote = quoteData as Quote | null;
   const profile = profileData as Profile | null;
   if (!quote || !profile) return { ok: false, error: "Quote not found" };
+  if (!accessInfo(profile).active) {
+    return { ok: false, error: LOCKED_MESSAGE };
+  }
   if (!quote.client_email) {
     return { ok: false, error: "Add the client's email address first." };
   }
@@ -216,6 +220,15 @@ export async function markSent(quoteId: string): Promise<SaveResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+  if (profileData && !accessInfo(profileData as Profile).active) {
+    return { ok: false, error: LOCKED_MESSAGE };
+  }
 
   const { error } = await supabase
     .from("quotes")
