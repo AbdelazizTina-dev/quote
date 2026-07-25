@@ -34,7 +34,7 @@ Sign in with a magic link, then fill in your business profile under Settings.
 - [x] **Phase 3:** Public client-facing quote page (`/q/{token}`)
 - [x] **Phase 4:** Stripe Connect onboarding + deposit checkout
 - [x] **Phase 5:** Dashboard polish (duplicate quote) + email sending
-- [ ] **Phase 6:** Subscription billing, error handling, deploy
+- [x] **Phase 6:** Subscription billing, error handling, deploy
 
 ## Architecture notes
 
