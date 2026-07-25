@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { btnPrimary, card, input, label } from "@/lib/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { card, input, label } from "@/lib/ui";
 import { signInWithMagicLink } from "./actions";
 
 export default async function LoginPage({
@@ -54,9 +55,9 @@ export default async function LoginPage({
                 {error}
               </p>
             )}
-            <button type="submit" className={`${btnPrimary} w-full`}>
+            <SubmitButton pendingLabel="Sending…" className="w-full">
               Send magic link
-            </button>
+            </SubmitButton>
           </form>
         )}
       </div>

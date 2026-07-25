@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 import type { Profile } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
-import { btnPrimary, btnSecondary, card, input, label } from "@/lib/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { btnSecondary, card, input, label } from "@/lib/ui";
 import { connectStripe, updateProfile } from "./actions";
 
 type StripeStatus = "none" | "incomplete" | "ready" | "unavailable";
@@ -188,9 +189,7 @@ export default async function ProfileSettingsPage({
           </fieldset>
 
           <div className="flex justify-end">
-            <button type="submit" className={btnPrimary}>
-              Save profile
-            </button>
+            <SubmitButton pendingLabel="Saving…">Save profile</SubmitButton>
           </div>
         </form>
 
@@ -225,17 +224,17 @@ export default async function ProfileSettingsPage({
                   accepted yet.
                 </p>
                 <form action={connectStripe}>
-                  <button type="submit" className={btnPrimary}>
+                  <SubmitButton pendingLabel="Opening Stripe…">
                     Finish Stripe setup
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             )}
             {stripeStatus === "none" && (
               <form action={connectStripe}>
-                <button type="submit" className={btnPrimary}>
+                <SubmitButton pendingLabel="Opening Stripe…">
                   Connect Stripe
-                </button>
+                </SubmitButton>
               </form>
             )}
             {stripeStatus === "unavailable" && (

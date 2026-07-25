@@ -14,7 +14,8 @@ import {
 import { createQuote } from "@/app/quotes/actions";
 import { AppHeader } from "@/components/app-header";
 import { StatusBadge } from "@/components/status-badge";
-import { btnPrimary, card } from "@/lib/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { card } from "@/lib/ui";
 
 type QuoteRow = Quote & {
   line_items: Pick<LineItem, "quantity" | "unit_price_cents">[];
@@ -93,9 +94,7 @@ export default async function DashboardPage({
             </p>
           </div>
           <form action={createQuote}>
-            <button type="submit" className={btnPrimary}>
-              + New quote
-            </button>
+            <SubmitButton pendingLabel="Creating…">+ New quote</SubmitButton>
           </form>
         </div>
 
