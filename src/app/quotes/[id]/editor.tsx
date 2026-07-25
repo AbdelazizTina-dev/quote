@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   depositCents,
   formatCents,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/types";
 import { btnPrimary, btnSecondary, card, input } from "@/lib/ui";
 import { StatusBadge } from "@/components/status-badge";
+import { SubmitButton } from "@/components/submit-button";
 import {
   deleteQuote,
   duplicateQuote,
@@ -22,6 +23,12 @@ import {
   sendQuote,
   type QuotePayload,
 } from "./actions";
+
+// Typing into a focused number field should replace the value, not append.
+const selectOnFocus = (e: React.FocusEvent<HTMLInputElement>) =>
+  e.currentTarget.select();
+
+const DEPOSIT_PRESETS = [10, 25, 50];
 
 type EditableItem = {
   key: number;
@@ -131,6 +138,19 @@ export function QuoteEditor({
     }
   }
 
+  const payloadJson = JSON.stringify(buildPayload());
+  // Initialized on first render == the state as loaded from the server.
+  const [savedJson, setSavedJson] = useState(payloadJson);
+  const isDirty = payloadJson !== savedJson;
+
+  // Warn before navigating away with unsaved edits.
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
+
   function buildPayload(): QuotePayload {
     return {
       client_name: clientName,
@@ -155,8 +175,11 @@ export function QuoteEditor({
 
   function handleSave() {
     setMessage(null);
+    const current = buildPayload();
+    const currentJson = JSON.stringify(current);
     startTransition(async () => {
-      const result = await saveQuote(quote.id, buildPayload());
+      const result = await saveQuote(quote.id, current);
+      if (result.ok) setSavedJson(currentJson);
       setMessage(
         result.ok
           ? { kind: "saved", text: "Quote saved." }
@@ -167,12 +190,15 @@ export function QuoteEditor({
 
   function handleEmailQuote() {
     setMessage(null);
+    const current = buildPayload();
+    const currentJson = JSON.stringify(current);
     startTransition(async () => {
-      const saved = await saveQuote(quote.id, buildPayload());
+      const saved = await saveQuote(quote.id, current);
       if (!saved.ok) {
         setMessage({ kind: "error", text: saved.error });
         return;
       }
+      setSavedJson(currentJson);
       const sent = await sendQuote(quote.id);
       if (sent.ok) {
         setMessage({ kind: "saved", text: `Quote emailed to ${clientEmail}.` });
@@ -204,9 +230,9 @@ export function QuoteEditor({
         </h1>
         <div className="flex items-center gap-3">
           <form action={duplicateQuote.bind(null, quote.id)}>
-            <button type="submit" className={btnSecondary}>
+            <SubmitButton variant="secondary" pendingLabel="Duplicating…">
               Duplicate
-            </button>
+            </SubmitButton>
           </form>
           <a
             href={`/quotes/${quote.id}/pdf`}
@@ -216,8 +242,12 @@ export function QuoteEditor({
           >
             View PDF
           </a>
-          <button onClick={handleSave} disabled={isPending} className={btnPrimary}>
-            {isPending ? "Saving…" : "Save"}
+          <button
+            onClick={handleSave}
+            disabled={isPending || !isDirty}
+            className={btnPrimary}
+          >
+            {isPending ? "Saving…" : isDirty ? "Save changes" : "Saved ✓"}
           </button>
         </div>
       </div>
@@ -355,7 +385,13 @@ export function QuoteEditor({
                 min="0"
                 step="0.25"
                 value={item.quantity}
+                onFocus={selectOnFocus}
                 onChange={(e) => updateItem(item.key, { quantity: e.target.value })}
+                onBlur={() =>
+                  updateItem(item.key, {
+                    quantity: String(parseFloat(item.quantity) || 0),
+                  })
+                }
                 className={input}
               />
               <div className="relative">
@@ -368,7 +404,13 @@ export function QuoteEditor({
                   min="0"
                   step="0.01"
                   value={item.unitPrice}
+                  onFocus={selectOnFocus}
                   onChange={(e) => updateItem(item.key, { unitPrice: e.target.value })}
+                  onBlur={() =>
+                    updateItem(item.key, {
+                      unitPrice: (parseFloat(item.unitPrice) || 0).toFixed(2),
+                    })
+                  }
                   className={`${input} pl-7`}
                 />
               </div>
@@ -412,6 +454,7 @@ export function QuoteEditor({
                     max="100"
                     step="0.01"
                     value={taxRate}
+                    onFocus={selectOnFocus}
                     onChange={(e) => setTaxRate(e.target.value)}
                     className="w-20 rounded-lg border border-zinc-300 bg-white py-1 pl-2 pr-6 text-sm text-zinc-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20"
                   />
@@ -430,33 +473,97 @@ export function QuoteEditor({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-50 p-4 ring-1 ring-inset ring-blue-100">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-blue-950">Deposit:</span>
-              <select
-                aria-label="Deposit type"
-                value={depositType}
-                onChange={(e) => setDepositType(e.target.value as DepositType)}
-                className="rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20"
-              >
-                <option value="percent">% of total</option>
-                <option value="fixed">Fixed $</option>
-              </select>
-              <input
-                aria-label="Deposit value"
-                type="number"
-                min="0"
-                step={depositType === "fixed" ? "0.01" : "1"}
-                value={depositValue}
-                onChange={(e) => setDepositValue(e.target.value)}
-                className="w-24 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20"
-              />
+          <div className="rounded-lg bg-blue-50 p-4 ring-1 ring-inset ring-blue-100">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-medium text-blue-950">
+                Deposit required to accept
+              </p>
+              <p className="text-sm text-blue-950">
+                Client pays:{" "}
+                <span className="text-lg font-bold tabular-nums">
+                  {formatCents(depositDueCents)}
+                </span>
+              </p>
             </div>
-            <div className="text-sm text-blue-950">
-              Deposit due:{" "}
-              <span className="text-base font-bold tabular-nums">
-                {formatCents(depositDueCents)}
-              </span>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {DEPOSIT_PRESETS.map((preset) => {
+                const active =
+                  depositType === "percent" &&
+                  Math.round(parseFloat(depositValue) || 0) === preset;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      setDepositType("percent");
+                      setDepositValue(String(preset));
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-blue-700 text-white"
+                        : "bg-white text-blue-900 ring-1 ring-inset ring-blue-200 hover:bg-blue-100"
+                    }`}
+                  >
+                    {preset}%
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => {
+                  if (depositType !== "fixed") {
+                    setDepositType("fixed");
+                    // Sensible starting point: ~25% of the current total.
+                    setDepositValue(
+                      totalCents > 0
+                        ? (Math.round(totalCents * 0.25) / 100).toFixed(2)
+                        : "100.00"
+                    );
+                  }
+                }}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  depositType === "fixed"
+                    ? "bg-blue-700 text-white"
+                    : "bg-white text-blue-900 ring-1 ring-inset ring-blue-200 hover:bg-blue-100"
+                }`}
+              >
+                Fixed $
+              </button>
+              <div className="relative">
+                {depositType === "fixed" && (
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-blue-900/60">
+                    $
+                  </span>
+                )}
+                <input
+                  aria-label={
+                    depositType === "fixed"
+                      ? "Deposit amount in dollars"
+                      : "Deposit percent of total"
+                  }
+                  type="number"
+                  min="0"
+                  step={depositType === "fixed" ? "0.01" : "1"}
+                  value={depositValue}
+                  onFocus={selectOnFocus}
+                  onChange={(e) => setDepositValue(e.target.value)}
+                  onBlur={() =>
+                    setDepositValue(
+                      depositType === "fixed"
+                        ? (parseFloat(depositValue) || 0).toFixed(2)
+                        : String(Math.round(parseFloat(depositValue) || 0))
+                    )
+                  }
+                  className={`w-28 rounded-lg border border-blue-200 bg-white py-1.5 text-sm text-zinc-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/20 ${
+                    depositType === "fixed" ? "pl-7 pr-2" : "pl-3 pr-8"
+                  }`}
+                />
+                {depositType === "percent" && (
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-blue-900/60">
+                    %
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -481,12 +588,13 @@ export function QuoteEditor({
 
       <div className="mt-8 flex justify-end">
         <form action={deleteQuote.bind(null, quote.id)}>
-          <button
-            type="submit"
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+          <SubmitButton
+            variant="danger"
+            pendingLabel="Deleting…"
+            confirmMessage="Delete this quote? The client link will stop working and this can't be undone."
           >
             Delete quote
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </main>
