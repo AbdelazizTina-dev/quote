@@ -4,13 +4,18 @@ import { getStripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { formatCents, type Profile } from "@/lib/types";
 import { AppHeader } from "@/components/app-header";
-import { btnPrimary, btnSecondary, card } from "@/lib/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { card } from "@/lib/ui";
 import { openBillingPortal, startSubscription } from "./actions";
 
 // Keeps the DB in sync with Stripe on every billing-page visit (covers
-// cancellations/renewals without depending solely on webhooks).
-async function syncSubscription(profile: Profile): Promise<Profile> {
-  if (!profile.stripe_customer_id) return profile;
+// cancellations/renewals without depending solely on webhooks). Returns
+// cancel_at_period_end live — "active but ending" renders differently
+// from "active and renewing".
+async function syncSubscription(
+  profile: Profile
+): Promise<{ profile: Profile; cancelAtPeriodEnd: boolean }> {
+  if (!profile.stripe_customer_id) return { profile, cancelAtPeriodEnd: false };
   try {
     const subs = await getStripe().subscriptions.list({
       customer: profile.stripe_customer_id,
@@ -19,30 +24,37 @@ async function syncSubscription(profile: Profile): Promise<Profile> {
     });
     const sub = subs.data[0];
     const status = sub?.status ?? "none";
+    const cancelAtPeriodEnd = sub?.cancel_at_period_end ?? false;
     const periodEnd = sub?.items.data[0]?.current_period_end;
-    if (status !== profile.subscription_status) {
+    const periodEndIso = periodEnd
+      ? new Date(periodEnd * 1000).toISOString()
+      : null;
+    if (
+      status !== profile.subscription_status ||
+      periodEndIso !== profile.subscription_period_end
+    ) {
       const supabase = await createClient();
       await supabase
         .from("profiles")
         .update({
           subscription_status: status,
-          subscription_period_end: periodEnd
-            ? new Date(periodEnd * 1000).toISOString()
-            : null,
+          subscription_period_end: periodEndIso,
         })
         .eq("id", profile.id);
       return {
-        ...profile,
-        subscription_status: status,
-        subscription_period_end: periodEnd
-          ? new Date(periodEnd * 1000).toISOString()
-          : null,
+        profile: {
+          ...profile,
+          subscription_status: status,
+          subscription_period_end: periodEndIso,
+        },
+        cancelAtPeriodEnd,
       };
     }
+    return { profile, cancelAtPeriodEnd };
   } catch {
     // Stripe unreachable — show last-known status.
   }
-  return profile;
+  return { profile, cancelAtPeriodEnd: false };
 }
 
 export default async function BillingPage({
@@ -64,9 +76,8 @@ export default async function BillingPage({
     .eq("id", user.id)
     .single();
   if (!data) redirect("/dashboard");
-  let profile = data as Profile;
 
-  profile = await syncSubscription(profile);
+  const { profile, cancelAtPeriodEnd } = await syncSubscription(data as Profile);
   const access = accessInfo(profile);
   const justSubscribed = Boolean(sessionId) && access.subscribed;
 
@@ -108,13 +119,19 @@ export default async function BillingPage({
                   </p>
                   <p className="mt-1 text-sm text-zinc-600">
                     Status:{" "}
-                    <span className="font-medium text-green-700">
-                      {profile.subscription_status}
+                    <span
+                      className={`font-medium ${
+                        cancelAtPeriodEnd ? "text-amber-700" : "text-green-700"
+                      }`}
+                    >
+                      {cancelAtPeriodEnd
+                        ? "cancelled"
+                        : profile.subscription_status}
                     </span>
                     {profile.subscription_period_end && (
                       <>
                         {" "}
-                        · renews{" "}
+                        · {cancelAtPeriodEnd ? "access until" : "renews"}{" "}
                         {new Date(
                           profile.subscription_period_end
                         ).toLocaleDateString("en-US", {
@@ -127,15 +144,23 @@ export default async function BillingPage({
                   </p>
                 </div>
                 <form action={openBillingPortal}>
-                  <button type="submit" className={btnSecondary}>
-                    Manage subscription
-                  </button>
+                  <SubmitButton variant="secondary" pendingLabel="Opening portal…">
+                    {cancelAtPeriodEnd ? "Resubscribe" : "Manage subscription"}
+                  </SubmitButton>
                 </form>
               </div>
-              <p className="mt-3 text-xs text-zinc-500">
-                Update your card, download invoices, or cancel anytime — changes
-                take effect at the end of the billing period.
-              </p>
+              {cancelAtPeriodEnd ? (
+                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  Your subscription is cancelled and won&apos;t renew. You keep
+                  full access until the date above — reactivate anytime from the
+                  portal.
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-zinc-500">
+                  Update your card, download invoices, or cancel anytime —
+                  changes take effect at the end of the billing period.
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -173,9 +198,9 @@ export default async function BillingPage({
                   )}
                 </p>
                 <form action={startSubscription}>
-                  <button type="submit" className={btnPrimary}>
+                  <SubmitButton pendingLabel="Opening checkout…">
                     Subscribe — {formatCents(PRICE_CENTS)}/month
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             </>

@@ -1,7 +1,7 @@
 import type { Profile } from "@/lib/types";
 
 export const TRIAL_DAYS = 30;
-export const PRICE_CENTS = 2900; // $29/month flat
+export const PRICE_CENTS = 1900; // $19/month flat
 
 const ACTIVE_STATUSES = ["active", "trialing", "past_due"];
 
